@@ -16,7 +16,8 @@ public final class NexoraPlayers extends JavaPlugin implements Listener {
     private OllamaClient ai;
     private PersonaManager personas;
     private ChatMemory memory;
-    private FightBotBridge fightBotBridge;\n    private BotMenu botMenu;
+    private FightBotBridge fightBotBridge;
+    private BotMenu botMenu;
     private volatile long lastGlobalReply;
 
     @Override
