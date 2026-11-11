@@ -1,0 +1,43 @@
+# NEXORA-PLAYERS 1.0.0
+# Requires Ollama running on the Minecraft server machine (or a reachable host).
+ai:
+  enabled: true
+  endpoint: "http://127.0.0.1:11434"
+  model: "qwen2.5:3b"
+  timeout-seconds: 35
+  max-tokens: 120
+  temperature: 0.85
+
+chat:
+  prefix: "&8[&bAI&8] "
+  respond-to-normal-chat: true
+  respond-chance-percent: 18
+  reply-cooldown-seconds: 18
+  global-cooldown-seconds: 5
+  minimum-message-length: 3
+  maximum-reply-length: 180
+  ignore-commands: true
+  allow-initiate-conversations: true
+  initiate-every-minutes: 8
+  initiate-chance-percent: 30
+  only-initiate-when-players-online: 1
+
+memory:
+  # Recent server chat context kept in RAM. Player-specific notes are saved in data/players.yml.
+  recent-messages: 12
+  remember-player-messages: true
+  max-player-messages: 8
+
+personas:
+  - name: Alex
+    display-name: "&bAlex"
+    personality: "Friendly survival player. Likes building, exploring, and helping new players."
+    greeting: "Anyone exploring today?"
+  - name: Raven
+    display-name: "&5Raven"
+    personality: "Competitive PvP player. Confident, playful, enjoys fair 1v1 challenges, never toxic."
+    greeting: "Who's up for a fair 1v1?"
+  - name: Milo
+    display-name: "&aMilo"
+    personality: "Curious and funny player. Loves random topics, Minecraft trivia, and jokes."
+    greeting: "Random question: what's the weirdest thing you've built?"
