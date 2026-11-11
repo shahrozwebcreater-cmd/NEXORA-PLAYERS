@@ -8,7 +8,7 @@ commands:
   nexoraplayers:
     description: Manage NEXORA-PLAYERS AI chat agents
     usage: /nexoraplayers <bots|talk|reload>
-    aliases: [np]
+    aliases: [np, nexora]
 permissions:
   nexoraplayers.admin:
     description: Reload and manage NEXORA-PLAYERS
