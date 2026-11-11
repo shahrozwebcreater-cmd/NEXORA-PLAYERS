@@ -96,13 +96,41 @@ public final class OllamaClient {
                 try {
                     JsonObject json = JsonParser.parseString(response.body()).getAsJsonObject();
                     if (openRouter) {
-                        answer = json.getAsJsonArray("choices").get(0).getAsJsonObject()
-                                .getAsJsonObject("message").get("content").getAsString();
-                    } else {
+                        if (json.has("error") && !json.get("error").isJsonNull()) {
+                            String detail = json.get("error").toString();
+                            plugin.getLogger().warning("OpenRouter returned an API error: " + detail);
+                        } else if (!json.has("choices") || json.get("choices").isJsonNull()
+                                || !json.get("choices").isJsonArray() || json.getAsJsonArray("choices").isEmpty()) {
+                            plugin.getLogger().warning("OpenRouter response has no choices. Response: "
+                                    + abbreviate(response.body(), 700));
+                        } else {
+                            var choice = json.getAsJsonArray("choices").get(0);
+                            if (choice != null && choice.isJsonObject()
+                                    && choice.getAsJsonObject().has("message")
+                                    && choice.getAsJsonObject().get("message").isJsonObject()) {
+                                JsonObject messageObject = choice.getAsJsonObject().getAsJsonObject("message");
+                                if (messageObject.has("content") && !messageObject.get("content").isJsonNull()) {
+                                    answer = messageObject.get("content").getAsString();
+                                } else {
+                                    plugin.getLogger().warning("OpenRouter returned an empty message. Response: "
+                                            + abbreviate(response.body(), 700));
+                                }
+                            } else {
+                                plugin.getLogger().warning("OpenRouter choice has no message. Response: "
+                                        + abbreviate(response.body(), 700));
+                            }
+                        }
+                    } else if (json.has("message") && json.get("message").isJsonObject()
+                            && json.getAsJsonObject("message").has("content")
+                            && !json.getAsJsonObject("message").get("content").isJsonNull()) {
                         answer = json.getAsJsonObject("message").get("content").getAsString();
+                    } else {
+                        plugin.getLogger().warning("Ollama response has no message content. Response: "
+                                + abbreviate(response.body(), 700));
                     }
                 } catch (Exception ex) {
-                    plugin.getLogger().warning("Could not parse AI response: " + ex.getMessage());
+                    plugin.getLogger().warning("Could not parse AI response (" + ex.getClass().getSimpleName()
+                            + "): " + ex.getMessage() + ". Response: " + abbreviate(response.body(), 700));
                 }
             } else {
                 plugin.getLogger().warning("AI provider returned HTTP " + response.statusCode() + ": "
@@ -110,6 +138,12 @@ public final class OllamaClient {
             }
             deliver(callback, answer);
         });
+    }
+
+    private static String abbreviate(String value, int max) {
+        if (value == null) return "<empty>";
+        String clean = value.replaceAll("[\\r\\n]+", " ");
+        return clean.length() <= max ? clean : clean.substring(0, max) + "...";
     }
 
     private void deliver(Consumer<String> callback, String response) {
