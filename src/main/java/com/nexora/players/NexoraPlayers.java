@@ -48,6 +48,7 @@ public final class NexoraPlayers extends JavaPlugin implements Listener {
     public void onPlayerChat(AsyncPlayerChatEvent event) {
         if (getConfig().getBoolean("chat.ignore-commands", true) && event.getMessage().startsWith("/")) return;
         String message = event.getMessage().trim();
+        if (fightBotBridge != null && fightBotBridge.isFightBot(event.getPlayer().getName())) return;
         if (message.length() < getConfig().getInt("chat.minimum-message-length", 3)) return;
         memory.add("[" + event.getPlayer().getName() + "]: " + message);
         if (!getConfig().getBoolean("ai.enabled", true)) return;
