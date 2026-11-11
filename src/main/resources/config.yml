@@ -33,6 +33,9 @@ fightbot-chat:
   minimum-bots: 2
   minimum-online-players: 1
   max-messages-per-hour: 12
+  # Chance that one selected FightBot replies to ordinary player chat.
+  player-reply-chance-percent: 100
+  player-reply-cooldown-seconds: 12
   default-personality: "You are a regular Minecraft server player. Be sociable, funny, casual, and varied. Sometimes discuss PvP, building, survival, games, music, or random everyday topics. Never sound like an assistant."
 
 memory:
