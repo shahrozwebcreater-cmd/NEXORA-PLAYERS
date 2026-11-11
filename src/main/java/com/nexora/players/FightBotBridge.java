@@ -11,7 +11,9 @@ import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ThreadLocalRandom;\nimport java.util.Set;\nimport java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Optional bridge to FightBot 6.x. It discovers FightBot's active bot records
@@ -22,7 +24,8 @@ public final class FightBotBridge {
     private final NexoraPlayers plugin;
     private BukkitTask task;
     private long hourStarted = System.currentTimeMillis();
-    private int messagesThisHour;\n    private final Set<String> selectedBots = ConcurrentHashMap.newKeySet();
+    private int messagesThisHour;
+    private final Set<String> selectedBots = ConcurrentHashMap.newKeySet();
 
     public FightBotBridge(NexoraPlayers plugin) {
         this.plugin = plugin;
