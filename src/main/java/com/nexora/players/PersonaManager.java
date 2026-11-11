@@ -31,7 +31,12 @@ public final class PersonaManager {
         personas = loaded;
     }
 
-    private static String value(Map<?, ?> row, String key, String fallback) {\n        Object value = row.get(key);\n        return value == null ? fallback : String.valueOf(value);\n    }\n\n    public List<Persona> all() { return Collections.unmodifiableList(personas); }
+    private static String value(Map<?, ?> row, String key, String fallback) {
+        Object value = row.get(key);
+        return value == null ? fallback : String.valueOf(value);
+    }
+
+    public List<Persona> all() { return Collections.unmodifiableList(personas); }
     public List<String> names() { return personas.stream().map(Persona::name).toList(); }
 
     public Persona find(String name) {
