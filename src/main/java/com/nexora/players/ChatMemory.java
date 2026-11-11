@@ -28,8 +28,16 @@ public final class ChatMemory {
         while (recent.size() > limit) recent.removeFirst();
     }
 
-    public synchronized String context() {
-        return String.join("\n", recent);
+    public synchronized String contextFor(String player) {
+        StringBuilder result = new StringBuilder(String.join("\n", recent));
+        Deque<String> entries = playerMemory.get(player.toLowerCase());
+        if (entries != null) {
+            synchronized (entries) {
+                if (!entries.isEmpty()) result.append("\nPast messages from ").append(player).append(": ")
+                        .append(String.join(" | ", entries));
+            }
+        }
+        return result.toString();
     }
 
     public void rememberPlayer(String player, String message) {
