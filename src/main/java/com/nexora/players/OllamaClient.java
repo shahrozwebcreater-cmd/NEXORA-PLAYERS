@@ -14,7 +14,7 @@ import java.util.function.Consumer;
 
 public final class OllamaClient {
     private final NexoraPlayers plugin;
-    private final HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
+    private final HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
 
     public OllamaClient(NexoraPlayers plugin) {
         this.plugin = plugin;
@@ -22,19 +22,40 @@ public final class OllamaClient {
 
     public void reply(Persona persona, String player, String message, String context, Consumer<String> callback) {
         if (!plugin.getConfig().getBoolean("ai.enabled", true)) {
-            callback.accept(null);
+            deliver(callback, null);
             return;
         }
-        String endpoint = plugin.getConfig().getString("ai.endpoint", "http://127.0.0.1:11434");
-        String model = plugin.getConfig().getString("ai.model", "qwen2.5:3b");
+
+        String provider = plugin.getConfig().getString("ai.provider", "openrouter").toLowerCase();
+        boolean openRouter = provider.equals("openrouter");
+        String endpoint = plugin.getConfig().getString("ai.endpoint",
+                openRouter ? "https://openrouter.ai/api/v1" : "http://127.0.0.1:11434");
+        String model = plugin.getConfig().getString("ai.model",
+                openRouter ? "openrouter/free" : "qwen2.5:3b");
+        String apiKey = plugin.getConfig().getString("ai.api-key", "");
+        if (openRouter && (apiKey == null || apiKey.isBlank())) {
+            apiKey = System.getenv("NEXORA_AI_API_KEY");
+        }
+        if (openRouter && (apiKey == null || apiKey.isBlank())) {
+            plugin.getLogger().warning("OpenRouter API key missing. Add ai.api-key in config.yml or set NEXORA_AI_API_KEY.");
+            deliver(callback, null);
+            return;
+        }
+
         int timeout = Math.max(5, plugin.getConfig().getInt("ai.timeout-seconds", 35));
         JsonObject body = new JsonObject();
         body.addProperty("model", model);
-        body.addProperty("stream", false);
-        JsonObject options = new JsonObject();
-        options.addProperty("temperature", plugin.getConfig().getDouble("ai.temperature", 0.85));
-        options.addProperty("num_predict", plugin.getConfig().getInt("ai.max-tokens", 120));
-        body.add("options", options);
+        body.addProperty("temperature", plugin.getConfig().getDouble("ai.temperature", 0.85));
+        body.addProperty(openRouter ? "max_tokens" : "num_predict",
+                plugin.getConfig().getInt("ai.max-tokens", 120));
+        if (!openRouter) {
+            body.addProperty("stream", false);
+            JsonObject options = new JsonObject();
+            options.addProperty("temperature", plugin.getConfig().getDouble("ai.temperature", 0.85));
+            options.addProperty("num_predict", plugin.getConfig().getInt("ai.max-tokens", 120));
+            body.add("options", options);
+        }
+
         JsonArray messages = new JsonArray();
         JsonObject system = new JsonObject();
         system.addProperty("role", "system");
@@ -50,34 +71,48 @@ public final class OllamaClient {
         messages.add(user);
         body.add("messages", messages);
 
-        HttpRequest request;
+        HttpRequest.Builder requestBuilder;
         try {
-            request = HttpRequest.newBuilder(URI.create(endpoint.replaceAll("/+$", "") + "/api/chat"))
+            String suffix = openRouter ? "/chat/completions" : "/api/chat";
+            requestBuilder = HttpRequest.newBuilder(URI.create(endpoint.replaceAll("/+$", "") + suffix))
                     .timeout(Duration.ofSeconds(timeout))
-                    .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
-                    .build();
+                    .header("Content-Type", "application/json");
+            if (openRouter) {
+                requestBuilder.header("Authorization", "Bearer " + apiKey)
+                        .header("X-Title", "NEXORA-PLAYERS");
+            }
         } catch (Exception ex) {
-            plugin.getLogger().warning("Invalid Ollama endpoint: " + ex.getMessage());
-            callback.accept(null);
+            plugin.getLogger().warning("Invalid AI endpoint: " + ex.getMessage());
+            deliver(callback, null);
             return;
         }
+
+        HttpRequest request = requestBuilder.POST(HttpRequest.BodyPublishers.ofString(body.toString())).build();
         client.sendAsync(request, HttpResponse.BodyHandlers.ofString()).whenComplete((response, error) -> {
             String answer = null;
             if (error != null) {
-                plugin.getLogger().warning("Ollama request failed: " + error.getMessage());
+                plugin.getLogger().warning("AI request failed: " + error.getMessage());
             } else if (response.statusCode() >= 200 && response.statusCode() < 300) {
                 try {
-                    answer = JsonParser.parseString(response.body()).getAsJsonObject()
-                            .getAsJsonObject("message").get("content").getAsString();
+                    JsonObject json = JsonParser.parseString(response.body()).getAsJsonObject();
+                    if (openRouter) {
+                        answer = json.getAsJsonArray("choices").get(0).getAsJsonObject()
+                                .getAsJsonObject("message").get("content").getAsString();
+                    } else {
+                        answer = json.getAsJsonObject("message").get("content").getAsString();
+                    }
                 } catch (Exception ex) {
-                    plugin.getLogger().warning("Could not parse Ollama response: " + ex.getMessage());
+                    plugin.getLogger().warning("Could not parse AI response: " + ex.getMessage());
                 }
             } else {
-                plugin.getLogger().warning("Ollama returned HTTP " + response.statusCode() + ": " + response.body());
+                plugin.getLogger().warning("AI provider returned HTTP " + response.statusCode() + ": "
+                        + response.body());
             }
-            final String result = answer;
-            Bukkit.getScheduler().runTask(plugin, () -> callback.accept(result));
+            deliver(callback, answer);
         });
+    }
+
+    private void deliver(Consumer<String> callback, String response) {
+        Bukkit.getScheduler().runTask(plugin, () -> callback.accept(response));
     }
 }
