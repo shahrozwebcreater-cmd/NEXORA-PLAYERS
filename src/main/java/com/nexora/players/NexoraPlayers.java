@@ -16,7 +16,7 @@ public final class NexoraPlayers extends JavaPlugin implements Listener {
     private OllamaClient ai;
     private PersonaManager personas;
     private ChatMemory memory;
-    private FightBotBridge fightBotBridge;
+    private FightBotBridge fightBotBridge;\n    private BotMenu botMenu;
     private volatile long lastGlobalReply;
 
     @Override
@@ -29,7 +29,7 @@ public final class NexoraPlayers extends JavaPlugin implements Listener {
         getServer().getPluginManager().registerEvents(this, this);
         getLogger().info("NEXORA-PLAYERS enabled with " + personas.all().size() + " AI personas.");
         scheduleConversationStarters();
-        fightBotBridge.start();
+        fightBotBridge.start();\n        botMenu = new BotMenu(this);
     }
 
     @Override
@@ -93,7 +93,15 @@ public final class NexoraPlayers extends JavaPlugin implements Listener {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (args.length == 0 || args[0].equalsIgnoreCase("bots")) {
+        if (args.length == 0 || args[0].equalsIgnoreCase("gui")) {
+            if (sender instanceof Player player) {
+                botMenu.open(player);
+            } else {
+                sender.sendMessage(color("&cRun /nexora in-game to open the bot GUI."));
+            }
+            return true;
+        }
+        if (args[0].equalsIgnoreCase("bots")) {
             sender.sendMessage(color("&bNEXORA-PLAYERS &7| AI personas: &f" + String.join(", ", personas.names())));
             sender.sendMessage(color("&7Use &f/np talk <persona> <message> &7to speak to one."));
             return true;
