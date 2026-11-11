@@ -170,29 +170,6 @@ public final class FightBotBridge {
         return null;
     }
 
-    private List<String> activeBotNames() {
-        List<String> result = new ArrayList<>();
-        Plugin fightBot = plugin.getServer().getPluginManager().getPlugin("FightBot");
-        if (fightBot == null || !fightBot.isEnabled()) return result;
-        try {
-            Object manager = readField(fightBot, "manager");
-            if (manager == null) return result;
-            Object raw = readField(manager, "bots");
-            if (!(raw instanceof Map<?, ?> bots)) return result;
-            for (Map.Entry<?, ?> entry : bots.entrySet()) {
-                Object record = entry.getValue();
-                Object nameValue = readField(record, "name");
-                Object bodyValue = readField(record, "body");
-                if (!(nameValue instanceof String name) || !(bodyValue instanceof LivingEntity body)) continue;
-                if (!body.isValid() || body.isDead() || name.isBlank()) continue;
-                result.add(name);
-            }
-        } catch (ReflectiveOperationException | RuntimeException ex) {
-            plugin.getLogger().warning("Could not read active FightBot bots. Check FightBot compatibility: " + ex.getMessage());
-        }
-        return result;
-    }
-
     private static Object readField(Object instance, String name) throws ReflectiveOperationException {
         if (instance == null) return null;
         Class<?> type = instance.getClass();
