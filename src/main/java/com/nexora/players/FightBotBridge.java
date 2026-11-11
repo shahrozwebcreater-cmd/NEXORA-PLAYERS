@@ -26,6 +26,7 @@ public final class FightBotBridge {
     private long hourStarted = System.currentTimeMillis();
     private int messagesThisHour;
     private final Set<String> selectedBots = ConcurrentHashMap.newKeySet();
+    private final Map<String, Long> playerReplyCooldowns = new ConcurrentHashMap<>();
 
     public FightBotBridge(NexoraPlayers plugin) {
         this.plugin = plugin;
@@ -93,6 +94,54 @@ public final class FightBotBridge {
             plugin.getLogger().warning("FightBot discovery failed: " + ex.getMessage());
         }
         return result;
+    }
+
+    /** Routes normal player chat to one selected, live FightBot. */
+    public boolean handlePlayerMessage(String playerName, String message) {
+        if (!plugin.getConfig().getBoolean("fightbot-chat.enabled", true)
+                || plugin.getConfig().getStringList("fightbot-chat.selected-bots").isEmpty()) return false;
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            List<String> selected = activeBotNames().stream().filter(this::isSelected).toList();
+            if (selected.isEmpty()) return;
+            String mentioned = selected.stream()
+                    .filter(name -> message.toLowerCase().contains(name.toLowerCase())
+                            || message.toLowerCase().contains("@" + name.toLowerCase()))
+                    .findFirst().orElse(null);
+            int chance = Math.max(0, Math.min(100,
+                    plugin.getConfig().getInt("fightbot-chat.player-reply-chance-percent", 100)));
+            if (mentioned == null && ThreadLocalRandom.current().nextInt(100) >= chance) return;
+            String speaker = mentioned != null ? mentioned
+                    : selected.get(ThreadLocalRandom.current().nextInt(selected.size()));
+            long now = System.currentTimeMillis();
+            long cooldown = Math.max(0, plugin.getConfig().getLong("fightbot-chat.player-reply-cooldown-seconds", 12)) * 1000L;
+            Long previous = playerReplyCooldowns.putIfAbsent(speaker.toLowerCase(), now);
+            if (previous != null && now - previous < cooldown) return;
+            playerReplyCooldowns.put(speaker.toLowerCase(), now);
+
+            String personality = plugin.getConfig().getString("fightbot-chat.default-personality",
+                    "You are a regular Minecraft player. Be casual, funny, sociable and natural.");
+            Persona botPersona = new Persona(speaker, speaker, personality, "Hey!");
+            String context = plugin.getMemory().contextFor(playerName);
+            plugin.getAi().reply(botPersona, playerName, message, context, answer -> {
+                if (answer == null || answer.isBlank()) {
+                    playerReplyCooldowns.remove(speaker.toLowerCase());
+                    return;
+                }
+                String safe = ChatColor.stripColor(answer).replaceAll("[\\r\\n]+", " ").trim();
+                safe = safe.replaceAll("(?i)^" + java.util.regex.Pattern.quote(speaker) + "\\s*[:>,-]\\s*", "");
+                if (safe.isBlank()) return;
+                int max = Math.max(40, plugin.getConfig().getInt("chat.maximum-reply-length", 180));
+                if (safe.length() > max) safe = safe.substring(0, max).trim();
+                Player bot = Bukkit.getPlayerExact(speaker);
+                if (bot == null || !bot.isOnline()) {
+                    plugin.getLogger().warning("Selected FightBot '" + speaker + "' is not exposed as an online Bukkit player; cannot send genuine bot chat.");
+                    return;
+                }
+                bot.chat(safe);
+                plugin.getMemory().add("[" + speaker + "]: " + safe);
+            });
+        });
+        return true;
     }
 
     private void tryConversation() {
