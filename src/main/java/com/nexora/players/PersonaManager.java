@@ -1,7 +1,5 @@
 package com.nexora.players;
 
-import org.bukkit.configuration.ConfigurationSection;
-import org.bukkit.configuration.file.FileConfiguration;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -24,16 +22,16 @@ public final class PersonaManager {
         plugin.reloadConfig();
         List<Persona> loaded = new ArrayList<>();
         for (Map<?, ?> row : plugin.getConfig().getMapList("personas")) {
-            String name = String.valueOf(row.getOrDefault("name", "Bot"));
-            String display = String.valueOf(row.getOrDefault("display-name", name));
-            String personality = String.valueOf(row.getOrDefault("personality", "Friendly Minecraft player."));
-            String greeting = String.valueOf(row.getOrDefault("greeting", "Hey everyone!"));
+            String name = value(row, "name", "Bot");
+            String display = value(row, "display-name", name);
+            String personality = value(row, "personality", "Friendly Minecraft player.");
+            String greeting = value(row, "greeting", "Hey everyone!");
             loaded.add(new Persona(name, NexoraPlayers.color(display), personality, greeting));
         }
         personas = loaded;
     }
 
-    public List<Persona> all() { return Collections.unmodifiableList(personas); }
+    private static String value(Map<?, ?> row, String key, String fallback) {\n        Object value = row.get(key);\n        return value == null ? fallback : String.valueOf(value);\n    }\n\n    public List<Persona> all() { return Collections.unmodifiableList(personas); }
     public List<String> names() { return personas.stream().map(Persona::name).toList(); }
 
     public Persona find(String name) {
