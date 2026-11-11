@@ -3,6 +3,7 @@ package com.nexora.players;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitTask;
 
@@ -88,11 +89,37 @@ public final class FightBotBridge {
             if (safe.isBlank()) return;
             int max = Math.max(40, plugin.getConfig().getInt("chat.maximum-reply-length", 180));
             if (safe.length() > max) safe = safe.substring(0, max).trim();
-            // Chat-style line, attributed to the actual active FightBot name.
-            Bukkit.broadcastMessage(ChatColor.WHITE + "<" + speaker + "> " + ChatColor.RESET + safe);
+            // Use the FightBot player object when Bukkit exposes it, so the server
+            // emits a genuine player chat event under that bot's username.
+            Player botPlayer = activeBotPlayer(speaker);
+            if (botPlayer != null) {
+                botPlayer.chat(safe);
+            } else {
+                // Compatibility fallback for FightBot builds whose bot body is not
+                // exposed as a Bukkit Player object.
+                Bukkit.broadcastMessage(ChatColor.WHITE + "<" + speaker + "> " + ChatColor.RESET + safe);
+            }
             plugin.getMemory().add("[" + speaker + "]: " + safe);
             messagesThisHour++;
         });
+    }
+
+    private Player activeBotPlayer(String wantedName) {
+        Plugin fightBot = plugin.getServer().getPluginManager().getPlugin("FightBot");
+        if (fightBot == null || !fightBot.isEnabled()) return null;
+        try {
+            Object manager = readField(fightBot, "manager");
+            Object raw = readField(manager, "bots");
+            if (!(raw instanceof Map<?, ?> bots)) return null;
+            for (Object record : bots.values()) {
+                Object name = readField(record, "name");
+                Object body = readField(record, "body");
+                if (wantedName.equals(name) && body instanceof Player player && player.isOnline()) return player;
+            }
+        } catch (ReflectiveOperationException | RuntimeException ex) {
+            plugin.getLogger().warning("Could not resolve FightBot chat sender: " + ex.getMessage());
+        }
+        return null;
     }
 
     private List<String> activeBotNames() {
