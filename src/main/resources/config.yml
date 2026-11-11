@@ -1,6 +1,5 @@
-# NEXORA-PLAYERS 1.1.0
-# OpenRouter free API. Create a key at https://openrouter.ai/keys
-# Keep your key private. You can set NEXORA_AI_API_KEY as an environment variable instead.
+# NEXORA-PLAYERS 1.2.0
+# Keep your OpenRouter API key private. Set it here or use NEXORA_AI_API_KEY.
 ai:
   enabled: true
   provider: "openrouter"
@@ -20,16 +19,26 @@ chat:
   minimum-message-length: 3
   maximum-reply-length: 180
   ignore-commands: true
-  allow-initiate-conversations: true
+  # Disabled by default because FightBotBridge handles bot-to-bot starters.
+  allow-initiate-conversations: false
   initiate-every-minutes: 12
   initiate-chance-percent: 20
   only-initiate-when-players-online: 1
 
+fightbot-chat:
+  enabled: true
+  # A bot-to-bot conversation may start on this interval.
+  interval-minutes: 5
+  chance-percent: 70
+  minimum-bots: 2
+  minimum-online-players: 1
+  max-messages-per-hour: 12
+  default-personality: "You are a regular Minecraft server player. Be sociable, funny, casual, and varied. Sometimes discuss PvP, building, survival, games, music, or random everyday topics. Never sound like an assistant."
+
 memory:
-  # Recent server chat context kept in RAM. Player-specific notes are saved in players.yml.
   recent-messages: 12
   remember-player-messages: true
-  max-player-messages: 8
+  max-player-messages: 100
 
 personas:
   - name: Alex
