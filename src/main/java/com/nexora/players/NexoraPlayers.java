@@ -10,14 +10,13 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import java.util.List;
-import java.util.Locale;
 import java.util.concurrent.ThreadLocalRandom;
 
 public final class NexoraPlayers extends JavaPlugin implements Listener {
     private OllamaClient ai;
     private PersonaManager personas;
     private ChatMemory memory;
+    private FightBotBridge fightBotBridge;
     private volatile long lastGlobalReply;
 
     @Override
@@ -26,15 +25,21 @@ public final class NexoraPlayers extends JavaPlugin implements Listener {
         this.memory = new ChatMemory(this);
         this.personas = new PersonaManager(this);
         this.ai = new OllamaClient(this);
+        this.fightBotBridge = new FightBotBridge(this);
         getServer().getPluginManager().registerEvents(this, this);
         getLogger().info("NEXORA-PLAYERS enabled with " + personas.all().size() + " AI personas.");
         scheduleConversationStarters();
+        fightBotBridge.start();
     }
 
     @Override
     public void onDisable() {
+        if (fightBotBridge != null) fightBotBridge.stop();
         if (memory != null) memory.save();
     }
+
+    public OllamaClient getAi() { return ai; }
+    public ChatMemory getMemory() { return memory; }
 
     @EventHandler
     public void onPlayerChat(AsyncPlayerChatEvent event) {
@@ -55,9 +60,8 @@ public final class NexoraPlayers extends JavaPlugin implements Listener {
         if (persona == null || !personas.tryCooldown(persona, getConfig().getLong("chat.reply-cooldown-seconds", 18))) return;
 
         final Persona selected = persona;
-        final String prompt = message;
         final String playerName = event.getPlayer().getName();
-        ai.reply(selected, playerName, prompt, memory.contextFor(playerName), response -> {
+        ai.reply(selected, playerName, message, memory.contextFor(playerName), response -> {
             if (response == null || response.isBlank()) return;
             lastGlobalReply = System.currentTimeMillis();
             String safe = ChatColor.stripColor(response).replaceAll("[\\r\\n]+", " ").trim();
@@ -74,7 +78,7 @@ public final class NexoraPlayers extends JavaPlugin implements Listener {
         long minutes = Math.max(1, getConfig().getLong("chat.initiate-every-minutes", 8));
         Bukkit.getScheduler().runTaskTimer(this, () -> {
             if (!getConfig().getBoolean("ai.enabled", true)
-                    || !getConfig().getBoolean("chat.allow-initiate-conversations", true)) return;
+                    || !getConfig().getBoolean("chat.allow-initiate-conversations", false)) return;
             if (Bukkit.getOnlinePlayers().size() < getConfig().getInt("chat.only-initiate-when-players-online", 1)) return;
             if (ThreadLocalRandom.current().nextInt(100) >= getConfig().getInt("chat.initiate-chance-percent", 30)) return;
             Persona persona = personas.random();
@@ -101,6 +105,7 @@ public final class NexoraPlayers extends JavaPlugin implements Listener {
             }
             reloadConfig();
             personas.reload();
+            fightBotBridge.start();
             sender.sendMessage(color("&aNEXORA-PLAYERS config reloaded."));
             return true;
         }
