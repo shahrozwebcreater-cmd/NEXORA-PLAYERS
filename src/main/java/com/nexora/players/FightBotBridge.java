@@ -52,6 +52,10 @@ public final class FightBotBridge {
         return List.copyOf(discoverActiveBots().stream().map(BotRecord::name).toList());
     }
 
+    public boolean isFightBot(String name) {
+        return activeBotNames().stream().anyMatch(bot -> bot.equalsIgnoreCase(name));
+    }
+
     public boolean isSelected(String name) {
         List<String> configured = plugin.getConfig().getStringList("fightbot-chat.selected-bots");
         return configured.stream().anyMatch(n -> n.equalsIgnoreCase(name));
