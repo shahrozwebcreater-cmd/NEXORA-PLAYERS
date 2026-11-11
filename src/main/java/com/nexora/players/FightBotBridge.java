@@ -11,7 +11,7 @@ import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.ThreadLocalRandom;\nimport java.util.Set;\nimport java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Optional bridge to FightBot 6.x. It discovers FightBot's active bot records
@@ -22,7 +22,7 @@ public final class FightBotBridge {
     private final NexoraPlayers plugin;
     private BukkitTask task;
     private long hourStarted = System.currentTimeMillis();
-    private int messagesThisHour;
+    private int messagesThisHour;\n    private final Set<String> selectedBots = ConcurrentHashMap.newKeySet();
 
     public FightBotBridge(NexoraPlayers plugin) {
         this.plugin = plugin;
@@ -44,6 +44,54 @@ public final class FightBotBridge {
         }
     }
 
+    public List<String> activeBotNames() {
+        return List.copyOf(discoverActiveBots().stream().map(BotRecord::name).toList());
+    }
+
+    public boolean isSelected(String name) {
+        List<String> configured = plugin.getConfig().getStringList("fightbot-chat.selected-bots");
+        return configured.stream().anyMatch(n -> n.equalsIgnoreCase(name));
+    }
+
+    public boolean toggleSelected(String name) {
+        List<String> configured = new ArrayList<>(plugin.getConfig().getStringList("fightbot-chat.selected-bots"));
+        String existing = configured.stream().filter(n -> n.equalsIgnoreCase(name)).findFirst().orElse(null);
+        boolean enabled;
+        if (existing != null) {
+            configured.remove(existing);
+            enabled = false;
+        } else {
+            configured.add(name);
+            enabled = true;
+        }
+        plugin.getConfig().set("fightbot-chat.selected-bots", configured);
+        plugin.saveConfig();
+        return enabled;
+    }
+
+    private record BotRecord(String name, LivingEntity body) {}
+
+    private List<BotRecord> discoverActiveBots() {
+        List<BotRecord> result = new ArrayList<>();
+        Plugin fightBot = plugin.getServer().getPluginManager().getPlugin("FightBot");
+        if (fightBot == null || !fightBot.isEnabled()) return result;
+        try {
+            Object manager = readField(fightBot, "manager");
+            if (manager == null) return result;
+            Object raw = readField(manager, "bots");
+            if (!(raw instanceof Map<?, ?> bots)) return result;
+            for (Object record : bots.values()) {
+                Object nameValue = readField(record, "name");
+                Object bodyValue = readField(record, "body");
+                if (!(nameValue instanceof String name) || !(bodyValue instanceof LivingEntity body)) continue;
+                if (body.isValid() && !body.isDead() && !name.isBlank()) result.add(new BotRecord(name, body));
+            }
+        } catch (ReflectiveOperationException | RuntimeException ex) {
+            plugin.getLogger().warning("FightBot discovery failed: " + ex.getMessage());
+        }
+        return result;
+    }
+
     private void tryConversation() {
         if (!plugin.getConfig().getBoolean("fightbot-chat.enabled", true)) return;
         if (Bukkit.getOnlinePlayers().size() < plugin.getConfig().getInt("fightbot-chat.minimum-online-players", 1)) return;
@@ -57,7 +105,7 @@ public final class FightBotBridge {
         int hourlyLimit = Math.max(1, plugin.getConfig().getInt("fightbot-chat.max-messages-per-hour", 12));
         if (messagesThisHour >= hourlyLimit) return;
 
-        List<String> botNames = activeBotNames();
+        List<String> botNames = activeBotNames().stream().filter(this::isSelected).toList();
         if (botNames.size() < Math.max(2, plugin.getConfig().getInt("fightbot-chat.minimum-bots", 2))) {
             if (!plugin.getServer().getPluginManager().isPluginEnabled("FightBot")) {
                 plugin.getLogger().fine("FightBot is not enabled; chat bridge is waiting.");
