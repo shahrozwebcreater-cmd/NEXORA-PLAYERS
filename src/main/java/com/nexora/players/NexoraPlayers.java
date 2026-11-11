@@ -39,7 +39,7 @@ public final class NexoraPlayers extends JavaPlugin implements Listener {
     }
 
     public OllamaClient getAi() { return ai; }
-    public ChatMemory getMemory() { return memory; }
+    public ChatMemory getMemory() { return memory; }\n    public FightBotBridge getFightBotBridge() { return fightBotBridge; }
 
     @EventHandler
     public void onPlayerChat(AsyncPlayerChatEvent event) {
