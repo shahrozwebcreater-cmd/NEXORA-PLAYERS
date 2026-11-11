@@ -30,7 +30,8 @@ public final class NexoraPlayers extends JavaPlugin implements Listener {
         getServer().getPluginManager().registerEvents(this, this);
         getLogger().info("NEXORA-PLAYERS enabled with " + personas.all().size() + " AI personas.");
         scheduleConversationStarters();
-        fightBotBridge.start();\n        botMenu = new BotMenu(this);
+        fightBotBridge.start();
+        botMenu = new BotMenu(this);
     }
 
     @Override
@@ -40,7 +41,8 @@ public final class NexoraPlayers extends JavaPlugin implements Listener {
     }
 
     public OllamaClient getAi() { return ai; }
-    public ChatMemory getMemory() { return memory; }\n    public FightBotBridge getFightBotBridge() { return fightBotBridge; }
+    public ChatMemory getMemory() { return memory; }
+    public FightBotBridge getFightBotBridge() { return fightBotBridge; }
 
     @EventHandler
     public void onPlayerChat(AsyncPlayerChatEvent event) {
