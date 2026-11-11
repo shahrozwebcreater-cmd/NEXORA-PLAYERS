@@ -57,7 +57,7 @@ public final class NexoraPlayers extends JavaPlugin implements Listener {
         final Persona selected = persona;
         final String prompt = message;
         final String playerName = event.getPlayer().getName();
-        ai.reply(selected, playerName, prompt, memory.context(), response -> {
+        ai.reply(selected, playerName, prompt, memory.contextFor(playerName), response -> {
             if (response == null || response.isBlank()) return;
             lastGlobalReply = System.currentTimeMillis();
             String safe = ChatColor.stripColor(response).replaceAll("[\\r\\n]+", " ").trim();
@@ -120,7 +120,7 @@ public final class NexoraPlayers extends JavaPlugin implements Listener {
             }
             String prompt = String.join(" ", java.util.Arrays.copyOfRange(args, 2, args.length));
             String playerName = sender instanceof Player p ? p.getName() : "Console";
-            ai.reply(persona, playerName, prompt, memory.context(), response -> {
+            ai.reply(persona, playerName, prompt, memory.contextFor(playerName), response -> {
                 if (response == null || response.isBlank()) {
                     sender.sendMessage(color("&cAI did not respond. Check Ollama and the model name."));
                     return;
