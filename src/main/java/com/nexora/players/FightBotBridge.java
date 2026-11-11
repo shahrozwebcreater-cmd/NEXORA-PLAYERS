@@ -148,63 +148,97 @@ public final class FightBotBridge {
         return true;
     }
 
+    private boolean conversationRunning;
+
     private void tryConversation() {
-        if (!plugin.getConfig().getBoolean("fightbot-chat.enabled", true)) return;
-        if (Bukkit.getOnlinePlayers().size() < plugin.getConfig().getInt("fightbot-chat.minimum-online-players", 1)) return;
-        if (ThreadLocalRandom.current().nextInt(100) >= plugin.getConfig().getInt("fightbot-chat.chance-percent", 70)) return;
+        if (!plugin.getConfig().getBoolean("fightbot-chat.enabled", true) || conversationRunning) return;
+        // A value of zero means bots may chat with nobody else online.
+        if (Bukkit.getOnlinePlayers().size() < Math.max(0,
+                plugin.getConfig().getInt("fightbot-chat.minimum-online-players", 0))) return;
 
         long now = System.currentTimeMillis();
         if (now - hourStarted >= 3_600_000L) {
             hourStarted = now;
             messagesThisHour = 0;
         }
-        int hourlyLimit = Math.max(1, plugin.getConfig().getInt("fightbot-chat.max-messages-per-hour", 12));
+        int hourlyLimit = Math.max(1, plugin.getConfig().getInt("fightbot-chat.max-messages-per-hour", 36));
         if (messagesThisHour >= hourlyLimit) return;
 
         List<String> botNames = activeBotNames().stream().filter(this::isSelected).toList();
-        if (botNames.size() < Math.max(2, plugin.getConfig().getInt("fightbot-chat.minimum-bots", 2))) {
-            if (!plugin.getServer().getPluginManager().isPluginEnabled("FightBot")) {
-                plugin.getLogger().fine("FightBot is not enabled; chat bridge is waiting.");
-            }
-            return;
-        }
+        if (botNames.size() < Math.max(2, plugin.getConfig().getInt("fightbot-chat.minimum-bots", 2))) return;
 
         int first = ThreadLocalRandom.current().nextInt(botNames.size());
         int second = ThreadLocalRandom.current().nextInt(botNames.size() - 1);
         if (second >= first) second++;
         String speaker = botNames.get(first);
         String partner = botNames.get(second);
+        conversationRunning = true;
+
+        String opener = "Start a casual conversation with " + partner
+                + ". Pick a fresh topic such as PvP, kits, survival, server events, jokes, or everyday chat. "
+                + "Sound like a Pakistani Minecraft player chatting with friends.";
+        sendConversationTurn(botNames, speaker, partner, opener, 1,
+                Math.max(2, plugin.getConfig().getInt("fightbot-chat.conversation-max-turns", 6)));
+    }
+
+    private void sendConversationTurn(List<String> botNames, String speaker, String partner,
+                                      String previousMessage, int turn, int maxTurns) {
+        if (turn > maxTurns || messagesThisHour >= Math.max(1,
+                plugin.getConfig().getInt("fightbot-chat.max-messages-per-hour", 36))) {
+            conversationRunning = false;
+            return;
+        }
+        if (!activeBotNames().stream().anyMatch(n -> n.equalsIgnoreCase(speaker))
+                || !activeBotNames().stream().anyMatch(n -> n.equalsIgnoreCase(partner))) {
+            conversationRunning = false;
+            return;
+        }
 
         String personality = plugin.getConfig().getString("fightbot-chat.default-personality",
-                "You are a regular Minecraft server player. Be sociable, funny, casual, and varied. Sometimes discuss PvP, builds, survival, games, music, or random everyday topics. Never sound like an assistant.");
-        Persona botPersona = new Persona(speaker, speaker, personality,
-                "Hey " + partner + ", what are you up to?");
+                "You are a Pakistani Minecraft player. Talk casually in Roman Urdu mixed with English.");
+        Persona botPersona = new Persona(speaker, speaker, personality, "Oye bro, kya scene hai?");
         String context = plugin.getMemory().contextFor(speaker);
-        String prompt = "Start or continue a casual public conversation with the other online FightBot named "
-                + partner + ". Recent server chat: " + context
-                + ". Write exactly one short natural Minecraft chat message (maximum 18 words). "
-                + "Do not use roleplay actions or claim you performed game actions. "
-                + "Do not include your username or a name prefix.";
-
+        String prompt = partner + " just said: " + previousMessage
+                + "\nReply directly to that message as " + speaker + ". Continue the same conversation naturally. "
+                + "Use Roman Urdu mixed with common gaming English, like 'kya scene hai bro', 'ap pvp kro ge?', "
+                + "'ruk aa raha hun', 'gg', 'ez', 'noob' where it fits. Do not force English. "
+                + "Keep it short (3-16 words), casual, varied, and relevant. "
+                + "You may ask a question to keep the chat going. No username prefix, no roleplay actions.";
         plugin.getAi().reply(botPersona, partner, prompt, context, answer -> {
-            if (answer == null || answer.isBlank()) return;
+            if (answer == null || answer.isBlank()) {
+                conversationRunning = false;
+                return;
+            }
             String safe = ChatColor.stripColor(answer).replaceAll("[\\r\\n]+", " ").trim();
             safe = safe.replaceAll("(?i)^" + java.util.regex.Pattern.quote(speaker) + "\\s*[:>,-]\\s*", "");
-            if (safe.isBlank()) return;
+            if (safe.isBlank()) {
+                conversationRunning = false;
+                return;
+            }
             int max = Math.max(40, plugin.getConfig().getInt("chat.maximum-reply-length", 180));
             if (safe.length() > max) safe = safe.substring(0, max).trim();
-            // Use the FightBot player object when Bukkit exposes it, so the server
-            // emits a genuine player chat event under that bot's username.
+
             Player botPlayer = activeBotPlayer(speaker);
             if (botPlayer != null) {
                 botPlayer.chat(safe);
             } else {
-                // Compatibility fallback for FightBot builds whose bot body is not
-                // exposed as a Bukkit Player object.
+                // Fallback for FightBot versions that do not expose their NPC as a Bukkit Player.
                 Bukkit.broadcastMessage(ChatColor.WHITE + "<" + speaker + "> " + ChatColor.RESET + safe);
             }
             plugin.getMemory().add("[" + speaker + "]: " + safe);
             messagesThisHour++;
+
+            if (turn >= maxTurns || messagesThisHour >= Math.max(1,
+                    plugin.getConfig().getInt("fightbot-chat.max-messages-per-hour", 36))) {
+                conversationRunning = false;
+                return;
+            }
+            int minDelay = Math.max(3, plugin.getConfig().getInt("fightbot-chat.conversation-delay-min-seconds", 8));
+            int maxDelay = Math.max(minDelay, plugin.getConfig().getInt("fightbot-chat.conversation-delay-max-seconds", 18));
+            long delay = ThreadLocalRandom.current().nextLong(minDelay, maxDelay + 1L);
+            Bukkit.getScheduler().runTaskLater(plugin, () ->
+                    sendConversationTurn(botNames, partner, speaker, safe, turn + 1, maxTurns),
+                    delay * 20L);
         });
     }
 
