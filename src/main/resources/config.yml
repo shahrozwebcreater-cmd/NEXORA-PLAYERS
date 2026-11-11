@@ -1,4 +1,4 @@
-# NEXORA-PLAYERS 1.2.0
+# NEXORA-PLAYERS 1.3.0
 # Keep your OpenRouter API key private. Set it here or use NEXORA_AI_API_KEY.
 ai:
   enabled: true
@@ -28,15 +28,18 @@ chat:
 fightbot-chat:
   enabled: true
   # A bot-to-bot conversation may start on this interval.
-  interval-minutes: 5
-  chance-percent: 70
+  interval-minutes: 2
+  chance-percent: 85
   minimum-bots: 2
-  minimum-online-players: 1
-  max-messages-per-hour: 12
+  minimum-online-players: 0
+  max-messages-per-hour: 36
   # Chance that one selected FightBot replies to ordinary player chat.
   player-reply-chance-percent: 100
   player-reply-cooldown-seconds: 12
-  default-personality: "You are a regular Minecraft server player. Be sociable, funny, casual, and varied. Sometimes discuss PvP, building, survival, games, music, or random everyday topics. Never sound like an assistant."
+  conversation-max-turns: 6
+  conversation-delay-min-seconds: 8
+  conversation-delay-max-seconds: 18
+  default-personality: "You are a Pakistani Minecraft player. Talk naturally in Roman Urdu mixed with English, like friends on a Pakistani Minecraft server. Be funny, sociable, casual, and varied. Discuss PvP, kits, survival, server events, jokes, games, music, and everyday topics. Never sound like an assistant."
 
 memory:
   recent-messages: 12
