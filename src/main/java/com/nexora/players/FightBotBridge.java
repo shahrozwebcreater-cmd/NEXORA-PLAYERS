@@ -233,11 +233,12 @@ public final class FightBotBridge {
                 conversationRunning = false;
                 return;
             }
+            final String nextMessage = safe;
             int minDelay = Math.max(3, plugin.getConfig().getInt("fightbot-chat.conversation-delay-min-seconds", 8));
             int maxDelay = Math.max(minDelay, plugin.getConfig().getInt("fightbot-chat.conversation-delay-max-seconds", 18));
             long delay = ThreadLocalRandom.current().nextLong(minDelay, maxDelay + 1L);
             Bukkit.getScheduler().runTaskLater(plugin, () ->
-                    sendConversationTurn(botNames, partner, speaker, safe, turn + 1, maxTurns),
+                    sendConversationTurn(botNames, partner, speaker, nextMessage, turn + 1, maxTurns),
                     delay * 20L);
         });
     }
