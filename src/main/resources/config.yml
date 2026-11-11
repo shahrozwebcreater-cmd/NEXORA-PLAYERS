@@ -1,10 +1,13 @@
-# NEXORA-PLAYERS 1.0.0
-# Requires Ollama running on the Minecraft server machine (or a reachable host).
+# NEXORA-PLAYERS 1.1.0
+# OpenRouter free API. Create a key at https://openrouter.ai/keys
+# Keep your key private. You can set NEXORA_AI_API_KEY as an environment variable instead.
 ai:
   enabled: true
-  endpoint: "http://127.0.0.1:11434"
-  model: "qwen2.5:3b"
-  timeout-seconds: 35
+  provider: "openrouter"
+  endpoint: "https://openrouter.ai/api/v1"
+  model: "openrouter/free"
+  api-key: ""
+  timeout-seconds: 45
   max-tokens: 120
   temperature: 0.85
 
@@ -12,18 +15,18 @@ chat:
   prefix: "&8[&bAI&8] "
   respond-to-normal-chat: true
   respond-chance-percent: 18
-  reply-cooldown-seconds: 18
-  global-cooldown-seconds: 5
+  reply-cooldown-seconds: 25
+  global-cooldown-seconds: 8
   minimum-message-length: 3
   maximum-reply-length: 180
   ignore-commands: true
   allow-initiate-conversations: true
-  initiate-every-minutes: 8
-  initiate-chance-percent: 30
+  initiate-every-minutes: 12
+  initiate-chance-percent: 20
   only-initiate-when-players-online: 1
 
 memory:
-  # Recent server chat context kept in RAM. Player-specific notes are saved in data/players.yml.
+  # Recent server chat context kept in RAM. Player-specific notes are saved in players.yml.
   recent-messages: 12
   remember-player-messages: true
   max-player-messages: 8
