@@ -51,6 +51,7 @@ public final class NexoraPlayers extends JavaPlugin implements Listener {
         if (message.length() < getConfig().getInt("chat.minimum-message-length", 3)) return;
         memory.add("[" + event.getPlayer().getName() + "]: " + message);
         if (!getConfig().getBoolean("ai.enabled", true)) return;
+        if (fightBotBridge != null && fightBotBridge.handlePlayerMessage(event.getPlayer().getName(), message)) return;
 
         Persona persona = personas.findMentioned(message);
         boolean direct = persona != null;
