@@ -14,7 +14,9 @@ import java.util.function.Consumer;
 
 public final class OllamaClient {
     private final NexoraPlayers plugin;
-    private final HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+    private final HttpClient client = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(10))
+            .build();
 
     public OllamaClient(NexoraPlayers plugin) {
         this.plugin = plugin;
@@ -26,33 +28,46 @@ public final class OllamaClient {
             return;
         }
 
-        String provider = plugin.getConfig().getString("ai.provider", "openrouter").toLowerCase();
+        String provider = plugin.getConfig().getString("ai.provider", "groq").toLowerCase();
+        boolean groq = provider.equals("groq");
         boolean openRouter = provider.equals("openrouter");
-        String endpoint = plugin.getConfig().getString("ai.endpoint",
-                openRouter ? "https://openrouter.ai/api/v1" : "http://127.0.0.1:11434");
-        String model = plugin.getConfig().getString("ai.model",
-                openRouter ? "openrouter/free" : "qwen2.5:3b");
+        boolean openAiCompatible = groq || openRouter;
+
+        String defaultEndpoint = groq ? "https://api.groq.com/openai/v1"
+                : openRouter ? "https://openrouter.ai/api/v1" : "http://127.0.0.1:11434";
+        String defaultModel = groq ? "llama-3.3-70b-versatile"
+                : openRouter ? "openrouter/free" : "qwen2.5:3b";
+        String endpoint = plugin.getConfig().getString("ai.endpoint", defaultEndpoint);
+        String model = plugin.getConfig().getString("ai.model", defaultModel);
         String apiKey = plugin.getConfig().getString("ai.api-key", "");
-        if (openRouter && (apiKey == null || apiKey.isBlank())) {
-            apiKey = System.getenv("NEXORA_AI_API_KEY");
+
+        if (apiKey == null || apiKey.isBlank()) {
+            if (groq) apiKey = System.getenv("GROQ_API_KEY");
+            if ((apiKey == null || apiKey.isBlank()) && openRouter) apiKey = System.getenv("NEXORA_AI_API_KEY");
+            if ((apiKey == null || apiKey.isBlank()) && groq) apiKey = System.getenv("NEXORA_AI_API_KEY");
         }
-        if (openRouter && (apiKey == null || apiKey.isBlank())) {
-            plugin.getLogger().warning("OpenRouter API key missing. Add ai.api-key in config.yml or set NEXORA_AI_API_KEY.");
+        if (openAiCompatible && (apiKey == null || apiKey.isBlank())) {
+            plugin.getLogger().warning(provider + " API key missing. Add ai.api-key in config.yml or set "
+                    + (groq ? "GROQ_API_KEY" : "NEXORA_AI_API_KEY") + ".");
             deliver(callback, null);
             return;
         }
 
         int timeout = Math.max(5, plugin.getConfig().getInt("ai.timeout-seconds", 35));
+        int maxTokens = Math.max(1, plugin.getConfig().getInt("ai.max-tokens", 120));
+        double temperature = plugin.getConfig().getDouble("ai.temperature", 0.85);
+
         JsonObject body = new JsonObject();
         body.addProperty("model", model);
-        body.addProperty("temperature", plugin.getConfig().getDouble("ai.temperature", 0.85));
-        body.addProperty(openRouter ? "max_tokens" : "num_predict",
-                plugin.getConfig().getInt("ai.max-tokens", 120));
-        if (!openRouter) {
+        body.addProperty("temperature", temperature);
+        if (openAiCompatible) {
+            body.addProperty(groq ? "max_completion_tokens" : "max_tokens", maxTokens);
+            body.addProperty("stream", false);
+        } else {
             body.addProperty("stream", false);
             JsonObject options = new JsonObject();
-            options.addProperty("temperature", plugin.getConfig().getDouble("ai.temperature", 0.85));
-            options.addProperty("num_predict", plugin.getConfig().getInt("ai.max-tokens", 120));
+            options.addProperty("temperature", temperature);
+            options.addProperty("num_predict", maxTokens);
             body.add("options", options);
         }
 
@@ -65,6 +80,7 @@ public final class OllamaClient {
                 + "You are a chat persona, not a real connected Minecraft client. Avoid markdown, links, slurs, harassment, and excessive emojis. "
                 + "Use the recent public chat context when useful. Recent context:\n" + context);
         messages.add(system);
+
         JsonObject user = new JsonObject();
         user.addProperty("role", "user");
         user.addProperty("content", player + " says: " + message);
@@ -73,16 +89,18 @@ public final class OllamaClient {
 
         HttpRequest.Builder requestBuilder;
         try {
-            String suffix = openRouter ? "/chat/completions" : "/api/chat";
+            String suffix = openAiCompatible ? "/chat/completions" : "/api/chat";
             requestBuilder = HttpRequest.newBuilder(URI.create(endpoint.replaceAll("/+$", "") + suffix))
                     .timeout(Duration.ofSeconds(timeout))
                     .header("Content-Type", "application/json");
+            if (openAiCompatible) {
+                requestBuilder.header("Authorization", "Bearer " + apiKey);
+            }
             if (openRouter) {
-                requestBuilder.header("Authorization", "Bearer " + apiKey)
-                        .header("X-Title", "NEXORA-PLAYERS");
+                requestBuilder.header("X-Title", "NEXORA-PLAYERS");
             }
         } catch (Exception ex) {
-            plugin.getLogger().warning("Invalid AI endpoint: " + ex.getMessage());
+            plugin.getLogger().warning("Invalid " + provider + " AI endpoint: " + ex.getMessage());
             deliver(callback, null);
             return;
         }
@@ -91,17 +109,14 @@ public final class OllamaClient {
         client.sendAsync(request, HttpResponse.BodyHandlers.ofString()).whenComplete((response, error) -> {
             String answer = null;
             if (error != null) {
-                plugin.getLogger().warning("AI request failed: " + error.getMessage());
+                plugin.getLogger().warning(provider + " AI request failed: " + error.getMessage());
             } else if (response.statusCode() >= 200 && response.statusCode() < 300) {
                 try {
                     JsonObject json = JsonParser.parseString(response.body()).getAsJsonObject();
-                    if (openRouter) {
-                        if (json.has("error") && !json.get("error").isJsonNull()) {
-                            String detail = json.get("error").toString();
-                            plugin.getLogger().warning("OpenRouter returned an API error: " + detail);
-                        } else if (!json.has("choices") || json.get("choices").isJsonNull()
-                                || !json.get("choices").isJsonArray() || json.getAsJsonArray("choices").isEmpty()) {
-                            plugin.getLogger().warning("OpenRouter response has no choices. Response: "
+                    if (openAiCompatible) {
+                        if (!json.has("choices") || !json.get("choices").isJsonArray()
+                                || json.getAsJsonArray("choices").isEmpty()) {
+                            plugin.getLogger().warning(provider + " response has no choices. Response: "
                                     + abbreviate(response.body(), 700));
                         } else {
                             var choice = json.getAsJsonArray("choices").get(0);
@@ -111,12 +126,10 @@ public final class OllamaClient {
                                 JsonObject messageObject = choice.getAsJsonObject().getAsJsonObject("message");
                                 if (messageObject.has("content") && !messageObject.get("content").isJsonNull()) {
                                     answer = messageObject.get("content").getAsString();
-                                } else {
-                                    plugin.getLogger().warning("OpenRouter returned an empty message. Response: "
-                                            + abbreviate(response.body(), 700));
                                 }
-                            } else {
-                                plugin.getLogger().warning("OpenRouter choice has no message. Response: "
+                            }
+                            if (answer == null || answer.isBlank()) {
+                                plugin.getLogger().warning(provider + " returned an empty message. Response: "
                                         + abbreviate(response.body(), 700));
                             }
                         }
@@ -129,12 +142,13 @@ public final class OllamaClient {
                                 + abbreviate(response.body(), 700));
                     }
                 } catch (Exception ex) {
-                    plugin.getLogger().warning("Could not parse AI response (" + ex.getClass().getSimpleName()
-                            + "): " + ex.getMessage() + ". Response: " + abbreviate(response.body(), 700));
+                    plugin.getLogger().warning("Could not parse " + provider + " AI response ("
+                            + ex.getClass().getSimpleName() + "): " + ex.getMessage()
+                            + ". Response: " + abbreviate(response.body(), 700));
                 }
             } else {
-                plugin.getLogger().warning("AI provider returned HTTP " + response.statusCode() + ": "
-                        + response.body());
+                plugin.getLogger().warning(provider + " AI provider returned HTTP "
+                        + response.statusCode() + ": " + abbreviate(response.body(), 900));
             }
             deliver(callback, answer);
         });
