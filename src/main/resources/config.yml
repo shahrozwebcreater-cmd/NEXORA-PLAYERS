@@ -1,11 +1,11 @@
-# NEXORA-PLAYERS 1.3.0
+# NEXORA-PLAYERS 1.3.1
 # Groq is the default provider. Keep your API key private.
 # You can put it here or set the GROQ_API_KEY environment variable.
 ai:
   enabled: true
   provider: "groq"
   endpoint: "https://api.groq.com/openai/v1"
-  model: "llama-3.3-70b-versatile"
+  model: "openai/gpt-oss-20b"
   api-key: ""
   timeout-seconds: 45
   max-tokens: 120
@@ -20,7 +20,6 @@ chat:
   minimum-message-length: 3
   maximum-reply-length: 180
   ignore-commands: true
-  # Disabled by default because FightBotBridge handles bot-to-bot starters.
   allow-initiate-conversations: false
   initiate-every-minutes: 12
   initiate-chance-percent: 20
@@ -28,13 +27,11 @@ chat:
 
 fightbot-chat:
   enabled: true
-  # A bot-to-bot conversation may start on this interval.
   interval-minutes: 5
   chance-percent: 70
   minimum-bots: 2
   minimum-online-players: 1
   max-messages-per-hour: 12
-  # Chance that one selected FightBot replies to ordinary player chat.
   player-reply-chance-percent: 100
   player-reply-cooldown-seconds: 12
   default-personality: "You are a regular Minecraft server player. Be sociable, funny, casual, and varied. Sometimes discuss PvP, building, survival, games, music, or random everyday topics. Never sound like an assistant."
