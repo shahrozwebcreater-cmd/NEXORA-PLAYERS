@@ -58,6 +58,7 @@ public final class FightBotBridge {
 
     public boolean isSelected(String name) {
         List<String> configured = plugin.getConfig().getStringList("fightbot-chat.selected-bots");
+        if (configured.isEmpty() && plugin.getConfig().getBoolean("fightbot-chat.auto-select-all-active-bots", true)) return true;
         return configured.stream().anyMatch(n -> n.equalsIgnoreCase(name));
     }
 
@@ -102,8 +103,7 @@ public final class FightBotBridge {
 
     /** Routes normal player chat to one selected, live FightBot. */
     public boolean handlePlayerMessage(String playerName, String message) {
-        if (!plugin.getConfig().getBoolean("fightbot-chat.enabled", true)
-                || plugin.getConfig().getStringList("fightbot-chat.selected-bots").isEmpty()) return false;
+        if (!plugin.getConfig().getBoolean("fightbot-chat.enabled", true)) return false;
         Bukkit.getScheduler().runTask(plugin, () -> {
             List<String> selected = activeBotNames().stream().filter(this::isSelected).toList();
             if (selected.isEmpty()) return;
