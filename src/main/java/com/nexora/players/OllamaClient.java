@@ -48,6 +48,13 @@ public final class OllamaClient {
         body.addProperty("temperature", plugin.getConfig().getDouble("ai.temperature", 0.85));
         body.addProperty(openRouter ? "max_tokens" : "num_predict",
                 plugin.getConfig().getInt("ai.max-tokens", 120));
+        if (openRouter) {
+            // Keep reasoning from consuming the entire completion budget before chat text is produced.
+            JsonObject reasoning = new JsonObject();
+            reasoning.addProperty("effort", "minimal");
+            reasoning.addProperty("max_tokens", 32);
+            body.add("reasoning", reasoning);
+        }
         if (!openRouter) {
             body.addProperty("stream", false);
             JsonObject options = new JsonObject();
@@ -61,6 +68,10 @@ public final class OllamaClient {
         system.addProperty("role", "system");
         system.addProperty("content", "You are " + persona.name() + ", a real-sounding Minecraft server player persona. "
                 + "Personality: " + persona.personality() + " Be natural, concise, friendly, and conversational. "
+                + "Language style: sound like a Pakistani Minecraft player. Prefer natural Roman Urdu mixed with everyday English, "
+                + "not formal or pure English. Examples: 'kya scene hai bro', 'ap pvp kro ge?', 'kahan ho', "
+                + "'ruk aa raha hun', 'nvm', 'gg', 'ez'. Match the conversation language and vary your wording; "
+                + "do not force slang into every sentence. "
                 + "Answer the player's actual message, including invitations such as 1v1. Never claim you performed game actions. "
                 + "You are a chat persona, not a real connected Minecraft client. Avoid markdown, links, slurs, harassment, and excessive emojis. "
                 + "Use the recent public chat context when useful. Recent context:\n" + context);
