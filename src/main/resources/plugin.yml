@@ -2,7 +2,7 @@ name: NEXORA-PLAYERS
 version: '${version}'
 main: com.nexora.players.NexoraPlayers
 api-version: '26.2'
-description: AI chat personas for Paper servers, powered by OpenRouter or Ollama.
+description: AI chat personas for Paper servers, powered by Groq, OpenRouter, or Ollama.
 author: NEXORA
 commands:
   nexoraplayers:
