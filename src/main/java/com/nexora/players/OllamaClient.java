@@ -48,6 +48,13 @@ public final class OllamaClient {
         body.addProperty("temperature", plugin.getConfig().getDouble("ai.temperature", 0.85));
         body.addProperty(openRouter ? "max_tokens" : "num_predict",
                 plugin.getConfig().getInt("ai.max-tokens", 120));
+        if (openRouter) {
+            // Keep reasoning from consuming the entire completion budget before chat text is produced.
+            JsonObject reasoning = new JsonObject();
+            reasoning.addProperty("effort", "minimal");
+            reasoning.addProperty("max_tokens", 32);
+            body.add("reasoning", reasoning);
+        }
         if (!openRouter) {
             body.addProperty("stream", false);
             JsonObject options = new JsonObject();
