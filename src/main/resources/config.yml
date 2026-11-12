@@ -1,4 +1,4 @@
-# NEXORA-PLAYERS 1.3.1
+# NEXORA-PLAYERS 1.4.0
 # Groq is the default provider. Keep your API key private.
 # You can put it here or set the GROQ_API_KEY environment variable.
 ai:
@@ -20,13 +20,15 @@ chat:
   minimum-message-length: 3
   maximum-reply-length: 180
   ignore-commands: true
-  allow-initiate-conversations: false
+  allow-initiate-conversations: true
   initiate-every-minutes: 12
   initiate-chance-percent: 20
   only-initiate-when-players-online: 1
 
 fightbot-chat:
   enabled: true
+  auto-select-all-active-bots: true
+  selected-bots: []
   interval-minutes: 5
   chance-percent: 70
   minimum-bots: 2
