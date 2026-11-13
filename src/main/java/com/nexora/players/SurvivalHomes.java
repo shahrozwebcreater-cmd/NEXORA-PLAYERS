@@ -11,9 +11,9 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitTask;
-import org.bukkit.util.Vector;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -27,6 +27,8 @@ public final class SurvivalHomes {
     private BukkitTask task;
     private final Map<String, BotState> states = new HashMap<>();
     private long tick;
+    private boolean navigationWarningLogged;
+    private boolean botDiscoveryLogged;
 
     private enum Phase { CHOOSE_HOME, GATHER_WOOD, BUILD_HOME, EXPLORE }
     private static final class BotState {
@@ -44,7 +46,7 @@ public final class SurvivalHomes {
         stop();
         if (!plugin.getConfig().getBoolean("survival.enabled", true)) return;
         task = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 100L, 20L);
-        plugin.getLogger().info("Independent survival homes controller started.");
+        plugin.getLogger().info("Independent survival controller started; waiting for FightBot bots.");
     }
 
     public void stop() {
@@ -54,7 +56,12 @@ public final class SurvivalHomes {
     private void tick() {
         if (++tick % 3 != 0) return;
         String worldName = plugin.getConfig().getString("gameplay.world", "world");
-        for (Bot bot : findBots()) {
+        List<Bot> activeBots = findBots();
+        if (!botDiscoveryLogged && !activeBots.isEmpty()) {
+            plugin.getLogger().info("Survival controller detected " + activeBots.size() + " FightBot player(s).");
+            botDiscoveryLogged = true;
+        }
+        for (Bot bot : activeBots) {
             Player player = bot.player;
             try { if (field(bot.record, "duelTarget") != null) continue; } catch (ReflectiveOperationException ignored) { }
             if (!player.getWorld().getName().equalsIgnoreCase(worldName)) continue;
@@ -102,12 +109,12 @@ public final class SurvivalHomes {
 
         Block tree = nearestLog(p.getLocation(), 18);
         if (tree == null) {
-            wander(p, state, 28);
+            wander(bot, state, 28);
             if (++state.idleTicks > 45) { state.idleTicks = 0; state.target = randomNearby(p.getLocation(), 48, 110); }
             return;
         }
         state.idleTicks = 0;
-        moveToward(p, center(tree.getLocation()), 0.28);
+        moveToward(bot, center(tree.getLocation()), 0.28, false);
         if (p.getLocation().distanceSquared(center(tree.getLocation())) < 16) {
             ItemStack tool = p.getInventory().getItemInMainHand();
             Collection<ItemStack> drops = tree.getDrops(tool, p);
@@ -120,7 +127,7 @@ public final class SurvivalHomes {
         Player p = bot.player;
         Location home = state.home;
         if (home == null || !home.getWorld().equals(p.getWorld())) { state.phase = Phase.CHOOSE_HOME; return; }
-        if (p.getLocation().distanceSquared(home) > 25) { moveToward(p, home.clone().add(0, 0, 0), 0.30); return; }
+        if (p.getLocation().distanceSquared(home) > 25) { moveToward(bot, home.clone().add(0, 0, 0), 0.30, true); return; }
 
         Material plank = firstPlank(p);
         if (plank == null) { state.phase = Phase.GATHER_WOOD; return; }
@@ -167,7 +174,7 @@ public final class SurvivalHomes {
         if (state.target == null || p.getLocation().distanceSquared(state.target) < 16) {
             state.target = randomNearby(state.home == null ? p.getLocation() : state.home, 30, 100);
         }
-        moveToward(p, state.target, 0.24);
+        moveToward(bot, state.target, 0.24, false);
         // Keep returning to the bot's own home occasionally.
         if (state.home != null && p.getLocation().distanceSquared(state.home) > 180L * 180L) {
             state.target = state.home.clone();
@@ -243,19 +250,35 @@ public final class SurvivalHomes {
         return best;
     }
 
-    private void wander(Player p, BotState s, int radius) {
-        if (s.target == null || p.getLocation().distanceSquared(s.target) < 9) s.target = randomNearby(p.getLocation(), 8, radius);
-        moveToward(p, s.target, .23);
+    private void wander(Bot bot, BotState s, int radius) {
+        Player p = bot.player;
+        if (s.target == null || p.getLocation().distanceSquared(s.target) < 9)
+            s.target = randomNearby(p.getLocation(), 8, radius);
+        moveToward(bot, s.target, .23, false);
     }
 
-    private void moveToward(Player p, Location target, double speed) {
-        if (target == null || !target.getWorld().equals(p.getWorld())) return;
-        Vector v = target.toVector().subtract(p.getLocation().toVector());
-        v.setY(Math.max(-.18, Math.min(.18, v.getY() * .08)));
-        if (v.lengthSquared() > .01) {
-            v.normalize().multiply(speed);
-            p.setVelocity(new Vector(v.getX(), p.getVelocity().getY(), v.getZ()));
-            p.setRotation((float)Math.toDegrees(Math.atan2(-v.getX(), v.getZ())), p.getLocation().getPitch());
+    /**
+     * Delegate movement to FightBot's own path planner. Direct velocity changes
+     * are overwritten by FightBot's movement tick, preventing survival tasks.
+     */
+    private void moveToward(Bot bot, Location target, double speed, boolean allowBuild) {
+        if (target == null || !target.getWorld().equals(bot.player.getWorld())) return;
+        try {
+            Plugin fightBot = Bukkit.getPluginManager().getPlugin("FightBot");
+            if (fightBot == null || !fightBot.isEnabled()) return;
+            Object manager = field(fightBot, "manager");
+            Object roamer = field(manager, "roamer");
+            if (roamer == null) return;
+            Method walkTo = roamer.getClass().getDeclaredMethod(
+                    "walkTo", bot.record.getClass(), Location.class, double.class, boolean.class);
+            walkTo.setAccessible(true);
+            walkTo.invoke(roamer, bot.record, target, speed, allowBuild);
+        } catch (ReflectiveOperationException | RuntimeException ex) {
+            if (!navigationWarningLogged) {
+                plugin.getLogger().warning("Could not use FightBot path navigation for survival tasks: "
+                        + ex.getClass().getSimpleName() + ": " + ex.getMessage());
+                navigationWarningLogged = true;
+            }
         }
     }
 
