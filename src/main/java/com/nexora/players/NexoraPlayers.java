@@ -17,6 +17,7 @@ public final class NexoraPlayers extends JavaPlugin implements Listener {
     private PersonaManager personas;
     private ChatMemory memory;
     private FightBotBridge fightBotBridge;
+    private SurvivalHomes survivalHomes;
     private BotMenu botMenu;
     private volatile long lastGlobalReply;
 
@@ -27,16 +28,19 @@ public final class NexoraPlayers extends JavaPlugin implements Listener {
         this.personas = new PersonaManager(this);
         this.ai = new OllamaClient(this);
         this.fightBotBridge = new FightBotBridge(this);
+        this.survivalHomes = new SurvivalHomes(this);
         getServer().getPluginManager().registerEvents(this, this);
         getLogger().info("NEXORA-PLAYERS enabled with " + personas.all().size() + " AI personas.");
         scheduleConversationStarters();
         fightBotBridge.start();
+        survivalHomes.start();
         botMenu = new BotMenu(this);
     }
 
     @Override
     public void onDisable() {
         if (fightBotBridge != null) fightBotBridge.stop();
+        if (survivalHomes != null) survivalHomes.stop();
         if (memory != null) memory.save();
     }
 
@@ -119,6 +123,7 @@ public final class NexoraPlayers extends JavaPlugin implements Listener {
             reloadConfig();
             personas.reload();
             fightBotBridge.start();
+            survivalHomes.start();
             sender.sendMessage(color("&aNEXORA-PLAYERS config reloaded."));
             return true;
         }
