@@ -97,7 +97,7 @@ public final class SurvivalHomes {
             }
             planks = count(p, m -> m.name().endsWith("_PLANKS"));
         }
-        if (planks >= 24) { state.phase = Phase.BUILD_HOME; state.target = state.home; return; }
+        if (planks >= 100) { state.phase = Phase.BUILD_HOME; state.target = state.home; return; }
 
         Block tree = nearestLog(p.getLocation(), 18);
         if (tree == null) {
@@ -124,28 +124,41 @@ public final class SurvivalHomes {
         Material plank = firstPlank(p);
         if (plank == null) { state.phase = Phase.GATHER_WOOD; return; }
         int used = 0;
+        int available = count(p, m -> m == plank);
         World w = home.getWorld();
         int bx = home.getBlockX(), by = home.getBlockY(), bz = home.getBlockZ();
         // Compact 5x5 shelter: plank floor, 3-high perimeter walls, simple roof.
         for (int x = -2; x <= 2; x++) for (int z = -2; z <= 2; z++) {
             Block floor = w.getBlockAt(bx+x, by, bz+z);
-            if (floor.getType().isAir() || floor.isPassable()) { floor.setType(plank, false); used++; }
+            if ((floor.getType().isAir() || floor.isPassable()) && available > 0) { floor.setType(plank, false); used++; available--; }
             boolean edge = Math.abs(x) == 2 || Math.abs(z) == 2;
             if (edge) for (int y = 1; y <= 3; y++) {
                 if (x == 0 && z == -2 && y <= 2) continue;
                 Block wall = w.getBlockAt(bx+x, by+y, bz+z);
-                if (wall.getType().isAir()) { wall.setType(plank, false); used++; }
+                if (wall.getType().isAir() && available > 0) { wall.setType(plank, false); used++; available--; }
             }
         }
         for (int x = -2; x <= 2; x++) for (int z = -2; z <= 2; z++) {
             Block roof = w.getBlockAt(bx+x, by+4, bz+z);
-            if (roof.getType().isAir()) { roof.setType(plank, false); used++; }
+            if (roof.getType().isAir() && available > 0) { roof.setType(plank, false); used++; available--; }
         }
-        consume(p, plank, Math.min(used, count(p, m -> m == plank)));
-        state.built = true;
-        state.phase = Phase.EXPLORE;
-        saveState(bot.name, state);
-        p.sendMessage("§a[NEXORA] Your own survival shelter is ready!");
+        consume(p, plank, used);
+        boolean complete = true;
+        for (int x = -2; x <= 2; x++) for (int z = -2; z <= 2; z++) {
+            if (w.getBlockAt(bx+x, by, bz+z).isAir() || w.getBlockAt(bx+x, by+4, bz+z).isAir()) complete = false;
+            if (Math.abs(x) == 2 || Math.abs(z) == 2) for (int y = 1; y <= 3; y++) {
+                if (!(x == 0 && z == -2 && y <= 2) && w.getBlockAt(bx+x, by+y, bz+z).isAir()) complete = false;
+            }
+        }
+        if (complete) {
+            state.built = true;
+            state.phase = Phase.EXPLORE;
+            saveState(bot.name, state);
+            p.sendMessage("§a[NEXORA] Your own survival shelter is ready!");
+        } else {
+            state.phase = Phase.GATHER_WOOD;
+            p.sendMessage("§e[NEXORA] Gathering more wood to finish your own house...");
+        }
     }
 
     private void explore(Bot bot, BotState state) {
