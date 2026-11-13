@@ -1,8 +1,8 @@
-# NEXORA-PLAYERS 1.3.0
+# NEXORA-PLAYERS 1.5.0
 
 AI-powered **public text-chat personas** for Paper 26.2. Personas can respond to players, hold short conversations using recent chat context, remember recent player messages, and occasionally start a conversation.
 
-> Important: this plugin creates chat personas, **not real Minecraft client/player entities**. They do not physically walk, mine, or attack mobs. FightBot remains a separate plugin and integration.
+> Important: NEXORA-PLAYERS does not create its own Minecraft client/player entities. Physical movement and combat are delegated to the separate FightBot plugin. This release can start FightBot free-roaming in one configured world and start/stop one-on-one duels from chat. It does not implement autonomous resource mining, farming, crafting, or inventory management.
 
 ## Requirements
 
@@ -15,7 +15,7 @@ AI-powered **public text-chat personas** for Paper 26.2. Personas can respond to
 
 1. Download the latest successful build artifact from this repository's **Actions** tab.
 2. Stop your server and back up the existing `plugins/NEXORA-PLAYERS/` folder.
-3. Replace the old plugin JAR with the new `NEXORA-PLAYERS-1.3.0.jar`.
+3. Replace the old plugin JAR with the new `NEXORA-PLAYERS-1.5.0.jar`.
 4. Start the server once, then stop it and open `plugins/NEXORA-PLAYERS/config.yml`.
 5. Paste your Groq key into `ai.api-key: ""`, keeping the quotation marks. Alternatively set the `GROQ_API_KEY` environment variable in your hosting panel.
 6. Confirm the AI settings below, then start the server.
@@ -44,6 +44,28 @@ Groq uses its OpenAI-compatible Chat Completions endpoint. The plugin sends the 
 - Ollama: `provider: "ollama"`, endpoint `http://127.0.0.1:11434`, model such as `qwen2.5:3b`.
 
 The plugin does not silently switch providers. To change provider, update its endpoint, model, and key together.
+
+## FightBot gameplay (1.5.0)
+
+Requires the separate FightBot plugin to be installed and enabled.
+
+- On startup, active FightBots in the configured world are ordered to use FightBot free roaming.
+- A chat challenge such as `1v1 me`, `duel me`, or `fight me` starts `/fb fight <bot> <player>` for one available bot in that world. If a bot name is included, that bot is selected; otherwise an available bot is chosen.
+- Saying `stop`, `stop pvp`, or `stop fighting` ends the duel started through this bridge with `/fb stop <bot>`. By default the bot then resumes free roaming.
+- The bridge tracks duels in memory; a plugin/server restart clears that temporary tracking.
+
+Configuration:
+
+```yaml
+gameplay:
+  enabled: true
+  world: "world"
+  start-free-roaming: true
+  challenge-only-pvp: true
+  stop-returns-to-roaming: true
+```
+
+FightBot's free roaming makes bots move around; it is not the same as survival grinding. Mining ores, chopping trees, farming, crafting, storing items, and managing food are not automated by this release.
 
 ## Commands
 
