@@ -1,4 +1,12 @@
-# NEXORA-PLAYERS 1.4.0
+# NEXORA-PLAYERS 1.5.0
+
+# Physical FightBot behaviour. This controls FightBot entities, not chat-only personas.
+gameplay:
+  enabled: true
+  world: "world"
+  start-free-roaming: true
+  challenge-only-pvp: true
+  stop-returns-to-roaming: true
 # Groq is the default provider. Keep your API key private.
 # You can put it here or set the GROQ_API_KEY environment variable.
 ai:
