@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "com.nexora"
-version = "1.6.0"
+version = "1.6.1"
 
 repositories {
     mavenCentral()
@@ -12,18 +12,18 @@ repositories {
 }
 
 dependencies {
-    compileOnly("io.papermc.paper:paper-api:26.2.build.+")
+    compileOnly("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
     implementation("com.google.code.gson:gson:2.13.1")
 }
 
 java {
-    toolchain.languageVersion.set(JavaLanguageVersion.of(25))
+    toolchain.languageVersion.set(JavaLanguageVersion.of(21))
 }
 
 tasks {
     compileJava {
         options.encoding = "UTF-8"
-        options.release.set(25)
+        options.release.set(21)
     }
     processResources {
         filteringCharset = "UTF-8"
