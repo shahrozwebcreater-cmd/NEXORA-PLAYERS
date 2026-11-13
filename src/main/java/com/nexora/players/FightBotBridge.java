@@ -185,6 +185,8 @@ public final class FightBotBridge {
     }
 
     private void startPlayerChallenge(String playerName, String originalMessage) {
+        if (!plugin.getConfig().getBoolean("gameplay.enabled", true)
+                || !plugin.getConfig().getBoolean("gameplay.challenge-only-pvp", true)) return;
         Player challenger = Bukkit.getPlayerExact(playerName);
         if (challenger == null || !challenger.isOnline()) return;
         String key = playerName.toLowerCase(java.util.Locale.ROOT);
@@ -238,8 +240,10 @@ public final class FightBotBridge {
         }
         activeFightPlayersByBot.remove(botName.toLowerCase(java.util.Locale.ROOT));
         Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "fb stop " + botName);
-        // FightBot's stop command ends the current job; resume harmless free roaming.
-        Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "fb roamingfree " + botName);
+        // FightBot's stop command ends the current job; resume free roaming when enabled.
+        if (plugin.getConfig().getBoolean("gameplay.stop-returns-to-roaming", true)) {
+            Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "fb roamingfree " + botName);
+        }
         if (player != null) player.sendMessage(ChatColor.GREEN + botName + " stopped PvP and returned to roaming.");
         plugin.getLogger().info("Stopped FightBot duel: " + botName + " (requested by " + playerName + ")");
     }
