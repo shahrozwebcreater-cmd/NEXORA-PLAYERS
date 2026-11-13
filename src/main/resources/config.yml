@@ -1,4 +1,11 @@
-# NEXORA-PLAYERS 1.5.0
+# NEXORA-PLAYERS 1.6.0
+
+# Independent FightBot survival homes (one home per physical bot).
+survival:
+  enabled: true
+  explore-radius: 850
+  minimum-home-separation: 120
+
 
 # Physical FightBot behaviour. This controls FightBot entities, not chat-only personas.
 gameplay:
