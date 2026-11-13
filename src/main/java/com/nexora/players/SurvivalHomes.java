@@ -146,9 +146,9 @@ public final class SurvivalHomes {
         consume(p, plank, used);
         boolean complete = true;
         for (int x = -2; x <= 2; x++) for (int z = -2; z <= 2; z++) {
-            if (w.getBlockAt(bx+x, by, bz+z).isAir() || w.getBlockAt(bx+x, by+4, bz+z).isAir()) complete = false;
+            if (w.getBlockAt(bx+x, by, bz+z).getType().isAir() || w.getBlockAt(bx+x, by+4, bz+z).getType().isAir()) complete = false;
             if (Math.abs(x) == 2 || Math.abs(z) == 2) for (int y = 1; y <= 3; y++) {
-                if (!(x == 0 && z == -2 && y <= 2) && w.getBlockAt(bx+x, by+y, bz+z).isAir()) complete = false;
+                if (!(x == 0 && z == -2 && y <= 2) && w.getBlockAt(bx+x, by+y, bz+z).getType().isAir()) complete = false;
             }
         }
         if (complete) {
