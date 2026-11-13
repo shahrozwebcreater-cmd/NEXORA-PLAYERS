@@ -1,7 +1,7 @@
 name: NEXORA-PLAYERS
 version: '${version}'
 main: com.nexora.players.NexoraPlayers
-api-version: '1.21.11'
+api-version: '1.21'
 description: AI chat personas for Paper servers, powered by Groq, OpenRouter, or Ollama.
 author: NEXORA
 commands:
