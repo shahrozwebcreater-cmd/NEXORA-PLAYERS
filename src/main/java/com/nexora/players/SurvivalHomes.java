@@ -56,6 +56,7 @@ public final class SurvivalHomes {
         String worldName = plugin.getConfig().getString("gameplay.world", "world");
         for (Bot bot : findBots()) {
             Player player = bot.player;
+            try { if (field(bot.record, "duelTarget") != null) continue; } catch (ReflectiveOperationException ignored) { }
             if (!player.getWorld().getName().equalsIgnoreCase(worldName)) continue;
             if (!player.isValid() || player.isDead()) continue;
             String key = bot.name.toLowerCase(Locale.ROOT);
@@ -281,7 +282,7 @@ public final class SurvivalHomes {
         try{return Material.valueOf(wood+"_PLANKS");}catch(IllegalArgumentException ex){return null;}
     }
 
-    private record Bot(String name, Player player) {}
+    private record Bot(String name, Player player, Object record) {}
     private List<Bot> findBots() {
         List<Bot> found=new ArrayList<>();
         Plugin fb=Bukkit.getPluginManager().getPlugin("FightBot");
@@ -292,7 +293,7 @@ public final class SurvivalHomes {
             for(Object rec:map.values()){
                 Object n=field(rec,"name"), body=field(rec,"body");
                 if(n instanceof String name && body instanceof Player player && player.isOnline() && player.isValid())
-                    found.add(new Bot(name,player));
+                    found.add(new Bot(name,player,rec));
             }
         }catch(ReflectiveOperationException|RuntimeException ex){
             plugin.getLogger().warning("Survival controller could not read FightBot records: "+ex.getMessage());
