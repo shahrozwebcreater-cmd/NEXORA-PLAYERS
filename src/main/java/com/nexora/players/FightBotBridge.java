@@ -27,6 +27,9 @@ public final class FightBotBridge {
     private int messagesThisHour;
     private final Set<String> selectedBots = ConcurrentHashMap.newKeySet();
     private final Map<String, Long> playerReplyCooldowns = new ConcurrentHashMap<>();
+    // A challenge is tracked per real player so "stop" only stops that player's duel.
+    private final Map<String, String> activeFightsByPlayer = new ConcurrentHashMap<>();
+    private final Map<String, String> activeFightPlayersByBot = new ConcurrentHashMap<>();
 
     public FightBotBridge(NexoraPlayers plugin) {
         this.plugin = plugin;
@@ -104,6 +107,15 @@ public final class FightBotBridge {
     /** Routes normal player chat to one selected, live FightBot. */
     public boolean handlePlayerMessage(String playerName, String message) {
         if (!plugin.getConfig().getBoolean("fightbot-chat.enabled", true)) return false;
+        String normalized = message.toLowerCase(java.util.Locale.ROOT).trim().replaceAll("\\s+", " ");
+        if (isStopRequest(normalized)) {
+            Bukkit.getScheduler().runTask(plugin, () -> stopPlayerFight(playerName));
+            return true;
+        }
+        if (isChallengeRequest(normalized)) {
+            Bukkit.getScheduler().runTask(plugin, () -> startPlayerChallenge(playerName, message));
+            return true;
+        }
         Bukkit.getScheduler().runTask(plugin, () -> {
             List<String> selected = activeBotNames().stream().filter(this::isSelected).toList();
             if (selected.isEmpty()) return;
@@ -146,6 +158,76 @@ public final class FightBotBridge {
             });
         });
         return true;
+    }
+
+
+    private boolean isChallengeRequest(String message) {
+        return message.matches(".*\\\\b(1v1|1\\\\s*vs\\\\s*1|duel|challenge|fight me|pvp me|wanna fight|want to fight|come fight|fight you)\\\\b.*");
+    }
+
+    private boolean isStopRequest(String message) {
+        return message.matches("^(stop|stop pvp|stop fight|stop fighting|stop now|end fight|end pvp|cancel fight|cancel pvp)[.! ]*$")
+                || message.matches(".*\\\\b(stop pvp|stop fighting|end the fight|end pvp|cancel the fight)\\\\b.*");
+    }
+
+    private void startPlayerChallenge(String playerName, String originalMessage) {
+        Player challenger = Bukkit.getPlayerExact(playerName);
+        if (challenger == null || !challenger.isOnline()) return;
+        String key = playerName.toLowerCase(java.util.Locale.ROOT);
+        if (activeFightsByPlayer.containsKey(key)) {
+            challenger.sendMessage(ChatColor.YELLOW + "You're already in a FightBot duel. Say 'stop' to end it.");
+            return;
+        }
+
+        List<BotRecord> candidates = discoverActiveBots().stream()
+                .filter(bot -> bot.body().getWorld().getName().equalsIgnoreCase(
+                        plugin.getConfig().getString("gameplay.world", "world")))
+                .filter(bot -> !activeFightPlayersByBot.containsKey(bot.name().toLowerCase(java.util.Locale.ROOT)))
+                .filter(bot -> bot.name().matches("[A-Za-z0-9_]{1,16}"))
+                .toList();
+        if (candidates.isEmpty()) {
+            challenger.sendMessage(ChatColor.YELLOW + "No free FightBot is available in world '"
+                    + plugin.getConfig().getString("gameplay.world", "world") + "' right now.");
+            return;
+        }
+
+        String lower = originalMessage.toLowerCase(java.util.Locale.ROOT);
+        BotRecord chosen = candidates.stream()
+                .filter(bot -> lower.contains(bot.name().toLowerCase(java.util.Locale.ROOT)))
+                .findFirst()
+                .orElseGet(() -> candidates.get(ThreadLocalRandom.current().nextInt(candidates.size())));
+
+        boolean dispatched = Bukkit.dispatchCommand(Bukkit.getConsoleSender(),
+                "fb fight " + chosen.name() + " " + challenger.getName());
+        if (!dispatched) {
+            challenger.sendMessage(ChatColor.RED + "FightBot command could not be dispatched. Check FightBot is enabled.");
+            return;
+        }
+        activeFightsByPlayer.put(key, chosen.name());
+        activeFightPlayersByBot.put(chosen.name().toLowerCase(java.util.Locale.ROOT), key);
+        String line = "Challenge accepted, " + playerName + "! Let's fight.";
+        if (chosen.body() instanceof Player botPlayer) {
+            botPlayer.chat(line);
+        } else {
+            Bukkit.broadcastMessage(ChatColor.WHITE + "<" + chosen.name() + "> " + ChatColor.RESET + line);
+        }
+        plugin.getLogger().info("Started FightBot duel: " + chosen.name() + " vs " + playerName);
+    }
+
+    private void stopPlayerFight(String playerName) {
+        Player player = Bukkit.getPlayerExact(playerName);
+        String key = playerName.toLowerCase(java.util.Locale.ROOT);
+        String botName = activeFightsByPlayer.remove(key);
+        if (botName == null) {
+            if (player != null) player.sendMessage(ChatColor.GRAY + "You don't have an active AI-started FightBot duel.");
+            return;
+        }
+        activeFightPlayersByBot.remove(botName.toLowerCase(java.util.Locale.ROOT));
+        Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "fb stop " + botName);
+        // FightBot's stop command ends the current job; resume harmless free roaming.
+        Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "fb roamingfree " + botName);
+        if (player != null) player.sendMessage(ChatColor.GREEN + botName + " stopped PvP and returned to roaming.");
+        plugin.getLogger().info("Stopped FightBot duel: " + botName + " (requested by " + playerName + ")");
     }
 
     private void tryConversation() {
