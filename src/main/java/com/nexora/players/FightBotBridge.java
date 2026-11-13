@@ -37,6 +37,10 @@ public final class FightBotBridge {
 
     public void start() {
         stop();
+        if (plugin.getConfig().getBoolean("gameplay.enabled", true)
+                && plugin.getConfig().getBoolean("gameplay.start-free-roaming", true)) {
+            Bukkit.getScheduler().runTaskLater(plugin, this::startFreeRoamingBots, 40L);
+        }
         if (!plugin.getConfig().getBoolean("fightbot-chat.enabled", true)) return;
         long minutes = Math.max(1, plugin.getConfig().getLong("fightbot-chat.interval-minutes", 5));
         task = Bukkit.getScheduler().runTaskTimer(plugin, this::tryConversation,
@@ -49,6 +53,16 @@ public final class FightBotBridge {
             task.cancel();
             task = null;
         }
+    }
+
+    private void startFreeRoamingBots() {
+        String worldName = plugin.getConfig().getString("gameplay.world", "world");
+        for (BotRecord bot : discoverActiveBots()) {
+            if (!bot.body().getWorld().getName().equalsIgnoreCase(worldName)) continue;
+            if (activeFightPlayersByBot.containsKey(bot.name().toLowerCase(java.util.Locale.ROOT))) continue;
+            Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "fb roamingfree " + bot.name());
+        }
+        plugin.getLogger().info("Started free roaming for available FightBots in world '" + worldName + "'.");
     }
 
     public List<String> activeBotNames() {
